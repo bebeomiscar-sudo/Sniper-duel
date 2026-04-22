@@ -2,12 +2,12 @@
     SNIPER DUEL TOOL
     - AC Safe: cloneref, no Player:GetMouse(), newcclosure
     - Combat: Aimbot + Silent Aim (util.Raycast hook)
-    - Visuals: ESP
+    - Visuals: ESP + Crosshair + World
     - UI Settings
 ]]
 
 -- ═══════════════════════════════════════════
--- SERVICES — All cloneref'd
+-- SERVICES
 -- ═══════════════════════════════════════════
 local cloneref = cloneref or function(obj) return obj end
 
@@ -24,9 +24,6 @@ local camera = Workspace.CurrentCamera
 
 -- ═══════════════════════════════════════════
 -- AC BYPASS
--- No Player:GetMouse() — that's the detection
--- All hooks use newcclosure
--- All services use cloneref
 -- ═══════════════════════════════════════════
 if hookmetamethod then
     if not game:IsLoaded() then game.Loaded:Wait() end
@@ -46,9 +43,7 @@ if hookmetamethod then
     end)
 end
 
--- ═══════════════════════════════════════════
--- MOUSE — Never uses Player:GetMouse()
--- ═══════════════════════════════════════════
+-- Never use Player:GetMouse()
 local function getMousePos()
     return UIS:GetMouseLocation()
 end
@@ -73,7 +68,7 @@ local Window = Library:CreateWindow({
     NotifySide           = "Left",
     TabPadding           = 8,
     MenuFadeTime         = 0.2,
-    Size                 = UDim2.fromOffset(500, 560),
+    Size                 = UDim2.fromOffset(520, 580),
 })
 
 local Tabs = {
@@ -87,49 +82,28 @@ local Tabs = {
 -- ═══════════════════════════════════════════
 local character        = LP.Character or LP.CharacterAdded:Wait()
 local humanoidRootPart = character:WaitForChild("HumanoidRootPart")
-local humanoid         = character:WaitForChild("Humanoid")
 
 LP.CharacterAdded:Connect(function(nc)
     character        = nc
     humanoidRootPart = nc:WaitForChild("HumanoidRootPart")
-    humanoid         = nc:WaitForChild("Humanoid")
 end)
 
 -- ═══════════════════════════════════════════
 -- MODULES
 -- ═══════════════════════════════════════════
-local rs = cloneref(game:GetService("ReplicatedStorage"))
-local ws = cloneref(game:GetService("Workspace"))
-
+local rs       = cloneref(game:GetService("ReplicatedStorage"))
 local util_mod = nil
-pcall(function()
-    util_mod = require(rs.Modules.Utility)
-end)
+
+pcall(function() util_mod = require(rs.Modules.Utility) end)
 pcall(function()
     if not util_mod then
         util_mod = require(rs:WaitForChild("Modules"):WaitForChild("Utility"))
     end
 end)
 
--- Camera controller for aimbot rotation
-local CameraController = nil
-pcall(function()
-    for _, d in ipairs(LP.PlayerScripts:GetDescendants()) do
-        if d:IsA("ModuleScript") and d.Name == "CameraController" then
-            local ok, m = pcall(require, d)
-            if ok and m and m.Rotation and m.SetRotation then
-                CameraController = m
-                break
-            end
-        end
-    end
-end)
-
 -- ═══════════════════════════════════════════
 -- CONFIGS
 -- ═══════════════════════════════════════════
-
--- Aimbot
 local AimbotCFG = {
     On           = false,
     FOV          = 150,
@@ -148,39 +122,50 @@ local AimbotCFG = {
     ForgotTime   = 5,
 }
 
--- Silent Aim
 local SACFG = {
     On        = false,
     HitChance = 100,
     FOV       = 150,
     DrawFOV   = true,
-    PartBias  = "Head", -- prefer head but fall back to body
+    PartBias  = "Head",
     TeamCheck = false,
+}
+
+local ESPConfig = {
+    Enabled     = false,
+    ShowBox     = true,
+    ShowName    = true,
+    ShowHealth  = true,
+    ShowDist    = true,
+    ShowLines   = false,
+    TeamColor   = false,
+    MaxDist     = 2000,
+    BoxColor    = Color3.fromRGB(255, 50,  50),
+    NameColor   = Color3.fromRGB(255, 255, 255),
+    LineColor   = Color3.fromRGB(255, 200, 0),
 }
 
 -- ═══════════════════════════════════════════
 -- TARGET PARTS
 -- ═══════════════════════════════════════════
-local ALL_PARTS = {
-    "Head", "HumanoidRootPart", "UpperTorso", "LowerTorso", "Torso",
-    "LeftUpperArm", "LeftLowerArm", "LeftHand",
-    "RightUpperArm", "RightLowerArm", "RightHand",
-    "LeftUpperLeg", "LeftLowerLeg", "LeftFoot",
-    "RightUpperLeg", "RightLowerLeg", "RightFoot",
-}
-
 local PART_PRESETS = {
     ["Head"]       = {"Head"},
-    ["Torso"]      = {"UpperTorso", "Torso", "LowerTorso", "HumanoidRootPart"},
-    ["UpperTorso"] = {"UpperTorso", "Torso", "HumanoidRootPart"},
-    ["LowerTorso"] = {"LowerTorso", "Torso", "HumanoidRootPart"},
-    ["Body"]       = {"UpperTorso", "LowerTorso", "Torso", "HumanoidRootPart"},
-    ["Nearest"]    = {"Head", "UpperTorso", "LowerTorso", "HumanoidRootPart"},
+    ["Torso"]      = {"UpperTorso","Torso","LowerTorso","HumanoidRootPart"},
+    ["UpperTorso"] = {"UpperTorso","Torso","HumanoidRootPart"},
+    ["LowerTorso"] = {"LowerTorso","Torso","HumanoidRootPart"},
+    ["Body"]       = {"UpperTorso","LowerTorso","Torso","HumanoidRootPart"},
+    ["Nearest"]    = {"Head","UpperTorso","LowerTorso","HumanoidRootPart"},
     ["Random"]     = {"Random"},
 }
 
-local ALL_PART_OPTIONS = {
-    "Head", "Torso", "UpperTorso", "LowerTorso", "Body", "Nearest", "Random"
+local ALL_PART_OPTIONS = {"Head","Torso","UpperTorso","LowerTorso","Body","Nearest","Random"}
+
+local ALL_PARTS = {
+    "Head","HumanoidRootPart","UpperTorso","LowerTorso","Torso",
+    "LeftUpperArm","LeftLowerArm","LeftHand",
+    "RightUpperArm","RightLowerArm","RightHand",
+    "LeftUpperLeg","LeftLowerLeg","LeftFoot",
+    "RightUpperLeg","RightLowerLeg","RightFoot",
 }
 
 local function getBestPart(char, setting)
@@ -214,9 +199,7 @@ end
 
 local function isSameTeam(p)
     local same = false
-    pcall(function()
-        same = p.Team ~= nil and LP.Team ~= nil and p.Team == LP.Team
-    end)
+    pcall(function() same = p.Team ~= nil and LP.Team ~= nil and p.Team == LP.Team end)
     pcall(function()
         local mi = LP:GetAttribute("TeamID")
         local ti = p:GetAttribute("TeamID")
@@ -253,19 +236,16 @@ local function isInAimbotFOV(part)
 end
 
 -- ═══════════════════════════════════════════
--- AIMBOT SYSTEM
--- XSmooth / YSmooth / ZSmooth:
---   Controls how quickly aim snaps on each axis
---   0 = instant, 1 = maximum lag
--- Prediction:
---   Leads the target based on their velocity
+-- AIMBOT
+-- Uses CFrame camera manipulation instead of
+-- CameraController since Sniper Duel doesn't
+-- expose one. Works on both PC and Mobile.
 -- ═══════════════════════════════════════════
 local lockedTarget  = nil
 local lockTimer     = 0
 local reactionTimer = 0
 local isInReaction  = false
 
--- Per-axis delayed position
 local delayedPosX = nil
 local delayedPosY = nil
 local delayedPosZ = nil
@@ -282,17 +262,16 @@ local function getSmoothedPos(part, dt)
         return nil
     end
 
-    -- Prediction: add velocity * prediction time to real position
     local real = part.Position
+
+    -- Prediction: lead target by velocity
     pcall(function()
         local hrp = part.Parent:FindFirstChild("HumanoidRootPart")
         if hrp and AimbotCFG.Prediction > 0 then
-            local vel = hrp.AssemblyLinearVelocity
-            real = real + vel * AimbotCFG.Prediction
+            real = real + hrp.AssemblyLinearVelocity * AimbotCFG.Prediction
         end
     end)
 
-    -- Initialize on first frame
     if not delayedPosX then
         delayedPosX = real.X
         delayedPosY = real.Y
@@ -301,12 +280,6 @@ local function getSmoothedPos(part, dt)
     end
 
     local frames = 60 * dt
-
-    -- Each axis has independent smoothness
-    -- XSmooth = horizontal plane (left/right)
-    -- YSmooth = vertical (up/down)
-    -- ZSmooth = depth (toward/away) — affects how quickly
-    --           aim corrects when target moves in/out of cover
     local xA = math.clamp((1 - AimbotCFG.XSmooth) * (1 + frames), 0.01, 1)
     local yA = math.clamp((1 - AimbotCFG.YSmooth) * (1 + frames), 0.01, 1)
     local zA = math.clamp((1 - AimbotCFG.ZSmooth) * (1 + frames), 0.01, 1)
@@ -335,7 +308,6 @@ local function findAimbotTarget()
     local center = getScreenCenter()
     local fov    = getEffectiveAimbotFOV()
     local best, bd = nil, fov
-
     for _, p in ipairs(Players:GetPlayers()) do
         if p == LP then continue end
         if AimbotCFG.TeamCheck and isSameTeam(p) then continue end
@@ -352,8 +324,26 @@ local function findAimbotTarget()
         if AimbotCFG.VisibleCheck and not isVisible(camera.CFrame.Position, part) then continue end
         if d < bd then bd = d; best = part end
     end
-
     return best
+end
+
+-- CFrame-based camera rotation
+-- Works for PC and Mobile since it directly
+-- sets the camera CFrame without needing any
+-- game-specific controller module
+local function rotateCameraToward(targetPos, dt)
+    local sm = math.clamp(1 / math.max(AimbotCFG.Smoothness, 0.1), 0.01, 1)
+    local camPos   = camera.CFrame.Position
+    local dir      = (targetPos - camPos).Unit
+    local targetCF = CFrame.new(camPos, camPos + dir)
+
+    -- Smoothly interpolate current camera CFrame toward target
+    local newCF = camera.CFrame:Lerp(targetCF, sm)
+
+    -- Use pcall in case game locks the camera
+    pcall(function()
+        camera.CFrame = newCF
+    end)
 end
 
 -- Aimbot FOV circle
@@ -367,14 +357,7 @@ fovCircle.Filled       = false
 
 -- ═══════════════════════════════════════════
 -- SILENT AIM — util.Raycast hook
--- Same method as Rivals script.
--- Redirects bullet raycast to nearest valid
--- target head within FOV.
--- HitChance: % chance per shot to redirect.
--- PartBias: which part to aim at server-side.
--- No distance limit — sniper game, shots are long.
 -- ═══════════════════════════════════════════
-
 local saFovCircle = Drawing.new("Circle")
 saFovCircle.NumSides     = 64
 saFovCircle.Visible      = false
@@ -385,7 +368,6 @@ saFovCircle.Filled       = false
 
 local saHookApplied = false
 
--- SA target finder — no distance check (sniper range)
 local function saGetTarget(origin)
     local center   = Vector2.new(camera.ViewportSize.X / 2, camera.ViewportSize.Y / 2)
     local best, bd = nil, math.huge
@@ -396,17 +378,12 @@ local function saGetTarget(origin)
         if SACFG.TeamCheck and isSameTeam(p) then continue end
         local char = p.Character
         if not char or char == myChar then continue end
-
-        -- Use PartBias to pick target part
         local targetPart = getBestPart(char, SACFG.PartBias)
         if not targetPart then continue end
-
         local hum = char:FindFirstChildOfClass("Humanoid")
         if not hum or hum.Health <= 0 then continue end
-
         local sp, vis = camera:WorldToViewportPoint(targetPart.Position)
         if not vis then continue end
-
         local d = (Vector2.new(sp.X, sp.Y) - center).Magnitude
         if d < SACFG.FOV and d < bd then
             bd   = d
@@ -420,17 +397,13 @@ end
 local function applySAHook()
     if saHookApplied then return end
     if not util_mod then
-        Library:Notify("SA: util_mod not found", 4)
+        Library:Notify("SA: util_mod not found — SA disabled", 4)
         return
     end
 
-    -- Hook util.Raycast
-    -- When player fires, game calls util.Raycast
-    -- We replace origin direction with direction toward target
     local origRaycast = util_mod.Raycast
     util_mod.Raycast = function(self, origin, direction, distance, ...)
         if SACFG.On then
-            -- HitChance check — random per shot
             if math.random(1, 100) <= SACFG.HitChance then
                 local target = saGetTarget(origin)
                 if target then
@@ -441,7 +414,6 @@ local function applySAHook()
         return origRaycast(self, origin, direction, distance, ...)
     end
 
-    -- Block flash/smoke/blind particles (same as Rivals)
     local origParticles = util_mod.PlayParticles
     if origParticles then
         util_mod.PlayParticles = function(self, obj)
@@ -456,7 +428,6 @@ local function applySAHook()
     end
 
     saHookApplied = true
-    Library:Notify("SA hook applied", 2)
 end
 
 local function startSA()
@@ -470,40 +441,20 @@ local function stopSA()
 end
 
 -- ═══════════════════════════════════════════
--- ESP SYSTEM
--- Features:
---   - Box (SelectionBox)
---   - Name tag
---   - Health bar
---   - Distance label
---   - Highlight color based on health
+-- ESP
 -- ═══════════════════════════════════════════
-local ESPConfig = {
-    Enabled        = false,
-    ShowBox        = true,
-    ShowName       = true,
-    ShowHealth     = true,
-    ShowDist       = true,
-    ShowLines      = false,
-    BoxColor       = Color3.fromRGB(255, 50,  50),
-    NameColor      = Color3.fromRGB(255, 255, 255),
-    HealthColor    = Color3.fromRGB(50,  255, 100),
-    LineColor      = Color3.fromRGB(255, 200, 0),
-    TeamColor      = false, -- color by team
-    MaxDist        = 2000,
-}
-
 local espObjects = {}
 
 local function removeESPFor(p)
     if not espObjects[p] then return end
     local obj = espObjects[p]
-    if obj.box     and obj.box.Parent     then obj.box:Destroy()     end
-    if obj.name    and obj.name.Parent    then obj.name:Destroy()    end
-    if obj.health  and obj.health.Parent  then obj.health:Destroy()  end
-    if obj.dist    and obj.dist.Parent    then obj.dist:Destroy()    end
-    if obj.line    then obj.line:Remove() end
-    if obj.hpbar   then obj.hpbar:Remove() end
+    pcall(function() if obj.box    then obj.box:Destroy()    end end)
+    pcall(function() if obj.name   then obj.name:Remove()    end end)
+    pcall(function() if obj.health then obj.health:Remove()  end end)
+    pcall(function() if obj.dist   then obj.dist:Remove()    end end)
+    pcall(function() if obj.line   then obj.line:Remove()    end end)
+    pcall(function() if obj.hpbar  then obj.hpbar:Remove()   end end)
+    pcall(function() if obj.hpbarbg then obj.hpbarbg:Remove() end end)
     espObjects[p] = nil
 end
 
@@ -513,21 +464,18 @@ local function clearAllESP()
     end
 end
 
+Players.PlayerRemoving:Connect(removeESPFor)
+
 local function makeESPFor(p)
     if espObjects[p] then return end
     local obj = {}
 
-    -- SelectionBox
-    if ESPConfig.ShowBox then
-        local box = Instance.new("SelectionBox")
-        box.Color3              = ESPConfig.BoxColor
-        box.LineThickness       = 0.04
-        box.SurfaceTransparency = 1
-        box.Parent              = Workspace
-        obj.box = box
-    end
+    obj.box = Instance.new("SelectionBox")
+    obj.box.Color3              = ESPConfig.BoxColor
+    obj.box.LineThickness       = 0.04
+    obj.box.SurfaceTransparency = 1
+    obj.box.Parent              = Workspace
 
-    -- Name tag (Drawing)
     obj.name = Drawing.new("Text")
     obj.name.Size    = 14
     obj.name.Outline = true
@@ -536,7 +484,6 @@ local function makeESPFor(p)
     obj.name.Color   = ESPConfig.NameColor
     obj.name.Font    = 2
 
-    -- Health text
     obj.health = Drawing.new("Text")
     obj.health.Size    = 13
     obj.health.Outline = true
@@ -544,7 +491,6 @@ local function makeESPFor(p)
     obj.health.Visible = false
     obj.health.Font    = 2
 
-    -- Distance text
     obj.dist = Drawing.new("Text")
     obj.dist.Size    = 12
     obj.dist.Outline = true
@@ -553,24 +499,21 @@ local function makeESPFor(p)
     obj.dist.Color   = Color3.fromRGB(200, 200, 200)
     obj.dist.Font    = 2
 
-    -- Line from screen bottom to player
     obj.line = Drawing.new("Line")
     obj.line.Thickness = 1
     obj.line.Visible   = false
     obj.line.Color     = ESPConfig.LineColor
 
-    -- Health bar (rectangle)
-    obj.hpbar     = Drawing.new("Square")
-    obj.hpbar.Filled      = true
-    obj.hpbar.Visible     = false
-    obj.hpbar.Color       = ESPConfig.HealthColor
-    obj.hpbar.Transparency = 0.8
-
-    obj.hpbarbg   = Drawing.new("Square")
+    obj.hpbarbg = Drawing.new("Square")
     obj.hpbarbg.Filled      = true
     obj.hpbarbg.Visible     = false
     obj.hpbarbg.Color       = Color3.fromRGB(30, 30, 30)
-    obj.hpbarbg.Transparency = 0.6
+    obj.hpbarbg.Transparency = 0.5
+
+    obj.hpbar = Drawing.new("Square")
+    obj.hpbar.Filled      = true
+    obj.hpbar.Visible     = false
+    obj.hpbar.Transparency = 0.15
 
     espObjects[p] = obj
 end
@@ -584,18 +527,16 @@ local function updateESP()
     for _, p in ipairs(Players:GetPlayers()) do
         if p == LP then continue end
 
-        local ch  = p.Character
-        local hrp = ch and ch:FindFirstChild("HumanoidRootPart")
-        local hum = ch and ch:FindFirstChildOfClass("Humanoid")
+        local ch   = p.Character
+        local hrp  = ch and ch:FindFirstChild("HumanoidRootPart")
+        local hum  = ch and ch:FindFirstChildOfClass("Humanoid")
         local head = ch and ch:FindFirstChild("Head")
 
-        -- Remove ESP if player invalid
         if not ch or not hrp or not hum or hum.Health <= 0 then
             removeESPFor(p)
             continue
         end
 
-        -- Distance check
         local dist = myPos and (myPos.Position - hrp.Position).Magnitude or 0
         if dist > ESPConfig.MaxDist then
             removeESPFor(p)
@@ -606,7 +547,7 @@ local function updateESP()
         local obj = espObjects[p]
         if not obj then continue end
 
-        -- Box color (team or config)
+        -- Box color
         local boxColor = ESPConfig.BoxColor
         if ESPConfig.TeamColor then
             boxColor = isSameTeam(p)
@@ -614,73 +555,67 @@ local function updateESP()
                 or  Color3.fromRGB(255, 50, 50)
         end
 
-        -- Update SelectionBox
-        if obj.box then
+        -- SelectionBox
+        if ESPConfig.ShowBox then
             obj.box.Adornee = ch
             obj.box.Color3  = boxColor
+        else
+            obj.box.Adornee = nil
         end
 
-        -- Screen position of head
-        local sp, onScreen = camera:WorldToViewportPoint(head and head.Position or hrp.Position)
+        local headPos      = head and head.Position or hrp.Position
+        local sp, onScreen = camera:WorldToViewportPoint(headPos)
         local sp2, _       = camera:WorldToViewportPoint(hrp.Position)
+        local screenPos    = Vector2.new(sp.X,  sp.Y)
+        local screenPos2   = Vector2.new(sp2.X, sp2.Y)
 
-        local screenPos = Vector2.new(sp.X, sp.Y)
-        local screenPos2 = Vector2.new(sp2.X, sp2.Y)
-
-        -- Name tag (above head)
-        obj.name.Visible = ESPConfig.ShowName and onScreen
-        if ESPConfig.ShowName and onScreen then
-            obj.name.Text     = p.DisplayName or p.Name
-            obj.name.Position = screenPos + Vector2.new(0, -22)
-            obj.name.Color    = ESPConfig.NameColor
-        end
-
-        -- Health text
-        local hpPct = hum.Health / hum.MaxHealth
-        local hpColor = Color3.fromRGB(
+        local hpPct    = math.clamp(hum.Health / math.max(hum.MaxHealth, 1), 0, 1)
+        local hpColor  = Color3.fromRGB(
             math.floor(255 * (1 - hpPct)),
             math.floor(255 * hpPct),
             50
         )
-        obj.health.Visible = ESPConfig.ShowHealth and onScreen
-        if ESPConfig.ShowHealth and onScreen then
-            obj.health.Text     = string.format("HP: %d/%d", math.floor(hum.Health), math.floor(hum.MaxHealth))
-            obj.health.Position = screenPos + Vector2.new(0, -36)
-            obj.health.Color    = hpColor
-        end
 
-        -- Distance label
-        obj.dist.Visible = ESPConfig.ShowDist and onScreen
-        if ESPConfig.ShowDist and onScreen then
-            obj.dist.Text     = string.format("%.0f studs", dist)
-            obj.dist.Position = screenPos2 + Vector2.new(0, 10)
-        end
+        -- Name
+        obj.name.Visible  = ESPConfig.ShowName and onScreen
+        obj.name.Text     = p.DisplayName ~= "" and p.DisplayName or p.Name
+        obj.name.Position = screenPos + Vector2.new(0, -24)
+        obj.name.Color    = ESPConfig.NameColor
 
-        -- Health bar (vertical bar left of player)
-        local barWidth  = 4
-        local barHeight = 40
-        local barX      = screenPos.X - 30
-        local barY      = screenPos.Y - barHeight / 2
+        -- Health text
+        obj.health.Visible  = ESPConfig.ShowHealth and onScreen
+        obj.health.Text     = string.format("%d HP", math.floor(hum.Health))
+        obj.health.Position = screenPos + Vector2.new(0, -38)
+        obj.health.Color    = hpColor
 
-        obj.hpbarbg.Visible     = ESPConfig.ShowHealth and onScreen
-        obj.hpbarbg.Position    = Vector2.new(barX, barY)
-        obj.hpbarbg.Size        = Vector2.new(barWidth, barHeight)
+        -- Distance
+        obj.dist.Visible  = ESPConfig.ShowDist and onScreen
+        obj.dist.Text     = string.format("%.0f studs", dist)
+        obj.dist.Position = screenPos2 + Vector2.new(0, 12)
 
-        obj.hpbar.Visible       = ESPConfig.ShowHealth and onScreen
-        obj.hpbar.Position      = Vector2.new(barX, barY + barHeight * (1 - hpPct))
-        obj.hpbar.Size          = Vector2.new(barWidth, barHeight * hpPct)
-        obj.hpbar.Color         = hpColor
+        -- Health bar
+        local barW  = 4
+        local barH  = 40
+        local barX  = screenPos.X - 34
+        local barY  = screenPos.Y - barH / 2
 
-        -- Tracer line from bottom center to player
+        obj.hpbarbg.Visible  = ESPConfig.ShowHealth and onScreen
+        obj.hpbarbg.Position = Vector2.new(barX, barY)
+        obj.hpbarbg.Size     = Vector2.new(barW, barH)
+
+        obj.hpbar.Visible    = ESPConfig.ShowHealth and onScreen
+        obj.hpbar.Position   = Vector2.new(barX, barY + barH * (1 - hpPct))
+        obj.hpbar.Size       = Vector2.new(barW, barH * hpPct)
+        obj.hpbar.Color      = hpColor
+
+        -- Tracer line
         obj.line.Visible = ESPConfig.ShowLines and onScreen
-        if ESPConfig.ShowLines and onScreen then
-            obj.line.From  = Vector2.new(center.X, camera.ViewportSize.Y)
-            obj.line.To    = screenPos
-            obj.line.Color = ESPConfig.LineColor
-        end
+        obj.line.From    = Vector2.new(center.X, camera.ViewportSize.Y)
+        obj.line.To      = screenPos
+        obj.line.Color   = ESPConfig.LineColor
     end
 
-    -- Cleanup for disconnected players
+    -- Cleanup disconnected players
     for p in pairs(espObjects) do
         local found = false
         for _, v in ipairs(Players:GetPlayers()) do
@@ -689,10 +624,6 @@ local function updateESP()
         if not found then removeESPFor(p) end
     end
 end
-
-Players.PlayerRemoving:Connect(function(p)
-    removeESPFor(p)
-end)
 
 -- ═══════════════════════════════════════════
 -- CROSSHAIR
@@ -712,7 +643,7 @@ crossImg.Image                  = "rbxassetid://97119437608195"
 crossImg.ImageTransparency      = 1
 
 -- ═══════════════════════════════════════════
--- WORLD EFFECTS
+-- WORLD
 -- ═══════════════════════════════════════════
 local colorCorrection = Instance.new("ColorCorrectionEffect")
 colorCorrection.Parent     = Lighting
@@ -724,21 +655,22 @@ blurEffect.Parent = Lighting
 blurEffect.Size   = 0
 
 -- ═══════════════════════════════════════════════════
--- ══════════════════ UI BUILDING ════════════════════
+-- ════════════════ UI BUILDING ══════════════════════
 -- ═══════════════════════════════════════════════════
 
 -- ─────────────────────────────────────────
 -- COMBAT TAB
+-- Left  = Aimbot main + Silent Aim main
+-- Right = Aimbot smoothing + SA settings
 -- ─────────────────────────────────────────
 local C_AB  = Tabs.Combat:AddLeftGroupbox("Aimbot")
-local C_AB2 = Tabs.Combat:AddRightGroupbox("Aimbot Smoothing")
+local C_AB2 = Tabs.Combat:AddRightGroupbox("Aimbot Smoothing & Prediction")
 local C_SA  = Tabs.Combat:AddLeftGroupbox("Silent Aim")
-local C_SA2 = Tabs.Combat:AddRightGroupbox("SA Settings")
+local C_SA2 = Tabs.Combat:AddRightGroupbox("Silent Aim Settings")
 
--- ── Aimbot ──
-C_AB:AddLabel("CamCtrl: " .. (CameraController and "OK" or "Not Found"))
+-- ── Aimbot Main ──
 C_AB:AddToggle("ABOn", {
-    Text     = "Enabled",
+    Text     = "Enable Aimbot",
     Default  = false,
     Callback = function(v)
         AimbotCFG.On = v
@@ -749,22 +681,71 @@ C_AB:AddToggle("ABOn", {
         end
     end
 })
+
 C_AB:AddDropdown("ABPart", {
     Text     = "Target Part",
     Default  = "Head",
     Values   = ALL_PART_OPTIONS,
     Callback = function(v) AimbotCFG.TargetPart = v end
 })
+
 C_AB:AddToggle("ABTeam", {
     Text     = "Team Check",
     Default  = false,
     Callback = function(v) AimbotCFG.TeamCheck = v end
 })
+
 C_AB:AddToggle("ABVis", {
     Text     = "Visible Check",
     Default  = false,
     Callback = function(v) AimbotCFG.VisibleCheck = v end
 })
+
+C_AB:AddSlider("ABSmooth", {
+    Text     = "Smoothness",
+    Default  = 10,
+    Min      = 1,
+    Max      = 100,
+    Rounding = 0,
+    Callback = function(v) AimbotCFG.Smoothness = v end
+})
+
+C_AB:AddSlider("ABFOV", {
+    Text     = "FOV",
+    Default  = 150,
+    Min      = 1,
+    Max      = 600,
+    Rounding = 0,
+    Callback = function(v)
+        AimbotCFG.FOV    = v
+        fovCircle.Radius = v
+    end
+})
+
+C_AB:AddToggle("ABDrawFOV", {
+    Text     = "Draw FOV Circle",
+    Default  = true,
+    Callback = function(v)
+        AimbotCFG.DrawFOV = v
+    end
+})
+
+C_AB:AddDropdown("ABFOVStyle", {
+    Text     = "FOV Style",
+    Default  = "Half",
+    Values   = {"Half","Filled","Invisible"},
+    Callback = function(v)
+        AimbotCFG.FOVStyle = v
+        fovCircle.Filled   = (v == "Filled")
+    end
+})
+
+C_AB:AddToggle("ABDynFOV", {
+    Text     = "Dynamic FOV",
+    Default  = false,
+    Callback = function(v) AimbotCFG.DynamicFOV = v end
+})
+
 C_AB:AddSlider("ABReact", {
     Text     = "Reaction Time (ms)",
     Default  = 0,
@@ -773,6 +754,7 @@ C_AB:AddSlider("ABReact", {
     Rounding = 0,
     Callback = function(v) AimbotCFG.ReactionTime = v end
 })
+
 C_AB:AddSlider("ABForgot", {
     Text     = "Forget Time (s)",
     Default  = 5,
@@ -781,51 +763,11 @@ C_AB:AddSlider("ABForgot", {
     Rounding = 0,
     Callback = function(v) AimbotCFG.ForgotTime = v end
 })
-C_AB:AddSlider("ABFOV", {
-    Text     = "FOV",
-    Default  = 150,
-    Min      = 0,
-    Max      = 600,
-    Rounding = 0,
-    Callback = function(v)
-        AimbotCFG.FOV    = v
-        fovCircle.Radius = v
-    end
-})
-C_AB:AddToggle("ABDrawFOV", {
-    Text     = "Draw FOV",
-    Default  = true,
-    Callback = function(v) AimbotCFG.DrawFOV = v end
-})
-C_AB:AddDropdown("ABFOVStyle", {
-    Text     = "FOV Style",
-    Default  = "Half",
-    Values   = {"Half", "Filled", "Invisible"},
-    Callback = function(v)
-        AimbotCFG.FOVStyle = v
-        fovCircle.Filled   = (v == "Filled")
-    end
-})
-C_AB:AddToggle("ABDynFOV", {
-    Text     = "Dynamic FOV",
-    Default  = false,
-    Callback = function(v) AimbotCFG.DynamicFOV = v end
-})
 
--- ── Aimbot Smoothing / Prediction ──
-C_AB2:AddLabel("Smoothness: 0 = instant, 100 = max lag")
+-- ── Aimbot Smoothing ──
+C_AB2:AddLabel("Per-axis delay: 0% = instant")
+C_AB2:AddLabel("X = left/right  Y = up/down  Z = depth")
 C_AB2:AddLabel("")
-
-C_AB2:AddSlider("ABSmooth", {
-    Text     = "Overall Smoothness",
-    Default  = 10,
-    Min      = 1,
-    Max      = 100,
-    Rounding = 0,
-    Callback = function(v) AimbotCFG.Smoothness = v end
-})
-
-C_AB2:AddLabel("── Per-Axis Delay ──")
 
 C_AB2:AddSlider("ABXSmooth", {
     Text     = "X Smooth (left/right)",
@@ -858,41 +800,41 @@ C_AB2:AddSlider("ABZSmooth", {
 })
 
 C_AB2:AddLabel("")
-C_AB2:AddLabel("── Prediction ──")
-C_AB2:AddLabel("Leads target based on velocity")
-C_AB2:AddLabel("0 = off, higher = more lead")
+C_AB2:AddLabel("Prediction: leads target by velocity")
+C_AB2:AddLabel("0 = off   higher = more lead")
+C_AB2:AddLabel("")
 
 C_AB2:AddSlider("ABPred", {
     Text     = "Prediction",
     Default  = 0,
     Min      = 0,
-    Max      = 30,
-    Rounding = 1,
-    Suffix   = "x",
-    Callback = function(v) AimbotCFG.Prediction = v / 100 end
+    Max      = 50,
+    Rounding = 0,
+    Suffix   = "ms",
+    Callback = function(v) AimbotCFG.Prediction = v / 1000 end
 })
 
 C_AB2:AddButton({
     Text = "Reset All Smoothing",
     Func = function()
-        AimbotCFG.XSmooth   = 0
-        AimbotCFG.YSmooth   = 0
-        AimbotCFG.ZSmooth   = 0
+        AimbotCFG.XSmooth    = 0
+        AimbotCFG.YSmooth    = 0
+        AimbotCFG.ZSmooth    = 0
         AimbotCFG.Prediction = 0
         resetDelayedPos()
         Library:Notify("Smoothing reset", 2)
     end
 })
 
--- ── Silent Aim ──
+-- ── Silent Aim Main ──
+C_SA:AddLabel("util_mod: " .. (util_mod and "OK" or "FAILED"))
 C_SA:AddLabel("Method: util.Raycast hook")
-C_SA:AddLabel("Redirects bullet to target within FOV")
-C_SA:AddLabel("No distance limit (sniper range)")
-C_SA:AddLabel("util_mod: " .. (util_mod and "OK" or "FAILED — SA won't work"))
+C_SA:AddLabel("Redirects bullet to target in FOV")
+C_SA:AddLabel("No distance limit")
 C_SA:AddLabel("")
 
 C_SA:AddToggle("SAOn", {
-    Text     = "Enabled",
+    Text     = "Enable Silent Aim",
     Default  = false,
     Callback = function(v)
         SACFG.On = v
@@ -915,9 +857,9 @@ C_SA:AddToggle("SADrawFOV", {
     end
 })
 
--- ── SA Settings ──
+-- ── Silent Aim Settings ──
 C_SA2:AddSlider("SAHitChance", {
-    Text     = "Hit Chance %",
+    Text     = "Hit Chance",
     Default  = 100,
     Min      = 1,
     Max      = 100,
@@ -926,8 +868,7 @@ C_SA2:AddSlider("SAHitChance", {
     Callback = function(v) SACFG.HitChance = v end
 })
 
-C_SA2:AddLabel("Hit Chance: % chance each shot redirects")
-C_SA2:AddLabel("Lower = more legit looking")
+C_SA2:AddLabel("Lower hit chance = more legit")
 C_SA2:AddLabel("")
 
 C_SA2:AddSlider("SAFOV", {
@@ -937,8 +878,8 @@ C_SA2:AddSlider("SAFOV", {
     Max      = 600,
     Rounding = 0,
     Callback = function(v)
-        SACFG.FOV           = v
-        saFovCircle.Radius  = v
+        SACFG.FOV          = v
+        saFovCircle.Radius = v
     end
 })
 
@@ -950,17 +891,19 @@ C_SA2:AddDropdown("SAPartBias", {
 })
 
 C_SA2:AddLabel("")
-C_SA2:AddLabel("── Particle Blocking ──")
-C_SA2:AddLabel("Auto-blocks flash, smoke, blind,")
-C_SA2:AddLabel("and muzzle particles on enable")
+C_SA2:AddLabel("Also blocks on enable:")
+C_SA2:AddLabel("Flash / Smoke / Blind / Muzzle")
 
 -- ─────────────────────────────────────────
 -- VISUALS TAB
+-- Left  = ESP main + ESP colors
+-- Right = Crosshair + World effects
 -- ─────────────────────────────────────────
-local V_ESP  = Tabs.Visuals:AddLeftGroupbox("ESP")
-local V_ESP2 = Tabs.Visuals:AddRightGroupbox("ESP Colors")
-local V_CH   = Tabs.Visuals:AddLeftGroupbox("Crosshair")
-local V_WD   = Tabs.Visuals:AddRightGroupbox("World")
+local V_ESP   = Tabs.Visuals:AddLeftGroupbox("ESP")
+local V_ESP2  = Tabs.Visuals:AddLeftGroupbox("ESP Colors")
+local V_CH    = Tabs.Visuals:AddRightGroupbox("Crosshair")
+local V_WD    = Tabs.Visuals:AddRightGroupbox("World Effects")
+local V_MISC  = Tabs.Visuals:AddRightGroupbox("Actions")
 
 -- ESP Main
 V_ESP:AddToggle("ESPOn", {
@@ -971,43 +914,43 @@ V_ESP:AddToggle("ESPOn", {
         if not v then clearAllESP() end
     end
 })
+
 V_ESP:AddToggle("ESPBox", {
-    Text     = "Show Box",
+    Text     = "Show Selection Box",
     Default  = true,
-    Callback = function(v)
-        ESPConfig.ShowBox = v
-        if not v then
-            for _, obj in pairs(espObjects) do
-                if obj.box then obj.box.Adornee = nil end
-            end
-        end
-    end
+    Callback = function(v) ESPConfig.ShowBox = v end
 })
+
 V_ESP:AddToggle("ESPName", {
     Text     = "Show Name",
     Default  = true,
     Callback = function(v) ESPConfig.ShowName = v end
 })
+
 V_ESP:AddToggle("ESPHealth", {
     Text     = "Show Health + Bar",
     Default  = true,
     Callback = function(v) ESPConfig.ShowHealth = v end
 })
+
 V_ESP:AddToggle("ESPDist", {
     Text     = "Show Distance",
     Default  = true,
     Callback = function(v) ESPConfig.ShowDist = v end
 })
+
 V_ESP:AddToggle("ESPLines", {
     Text     = "Show Tracer Lines",
     Default  = false,
     Callback = function(v) ESPConfig.ShowLines = v end
 })
+
 V_ESP:AddToggle("ESPTeamColor", {
-    Text     = "Team-Based Colors",
+    Text     = "Team Based Colors",
     Default  = false,
     Callback = function(v) ESPConfig.TeamColor = v end
 })
+
 V_ESP:AddSlider("ESPMaxDist", {
     Text     = "Max Distance",
     Default  = 2000,
@@ -1027,6 +970,7 @@ V_ESP2:AddLabel("Box Color"):AddColorPicker("ESPBoxColor", {
         end
     end
 })
+
 V_ESP2:AddLabel("Name Color"):AddColorPicker("ESPNameColor", {
     Default  = Color3.fromRGB(255, 255, 255),
     Callback = function(v)
@@ -1036,6 +980,7 @@ V_ESP2:AddLabel("Name Color"):AddColorPicker("ESPNameColor", {
         end
     end
 })
+
 V_ESP2:AddLabel("Line Color"):AddColorPicker("ESPLineColor", {
     Default  = Color3.fromRGB(255, 200, 0),
     Callback = function(v)
@@ -1055,6 +1000,7 @@ V_CH:AddToggle("CrossOn", {
         UIS.MouseIconEnabled       = not v
     end
 })
+
 V_CH:AddSlider("CrossSize", {
     Text     = "Size",
     Default  = 24,
@@ -1063,16 +1009,18 @@ V_CH:AddSlider("CrossSize", {
     Rounding = 0,
     Callback = function(v) crossImg.Size = UDim2.new(0, v, 0, v) end
 })
+
 V_CH:AddLabel("Color"):AddColorPicker("CrossColor", {
     Default  = Color3.fromRGB(255, 255, 255),
     Callback = function(v) crossImg.ImageColor3 = v end
 })
 
--- World
+-- World Effects
 V_WD:AddLabel("Tint"):AddColorPicker("WDTint", {
     Default  = Color3.fromRGB(255, 255, 255),
     Callback = function(v) colorCorrection.TintColor = v end
 })
+
 V_WD:AddSlider("WDSat", {
     Text     = "Saturation",
     Default  = 0,
@@ -1081,6 +1029,7 @@ V_WD:AddSlider("WDSat", {
     Rounding = 2,
     Callback = function(v) colorCorrection.Saturation = v end
 })
+
 V_WD:AddSlider("WDCon", {
     Text     = "Contrast",
     Default  = 0,
@@ -1089,6 +1038,7 @@ V_WD:AddSlider("WDCon", {
     Rounding = 2,
     Callback = function(v) colorCorrection.Contrast = v end
 })
+
 V_WD:AddSlider("WDBlur", {
     Text     = "Blur",
     Default  = 0,
@@ -1097,6 +1047,7 @@ V_WD:AddSlider("WDBlur", {
     Rounding = 0,
     Callback = function(v) blurEffect.Size = v end
 })
+
 V_WD:AddSlider("WDBright", {
     Text     = "Brightness",
     Default  = 1,
@@ -1105,14 +1056,16 @@ V_WD:AddSlider("WDBright", {
     Rounding = 1,
     Callback = function(v) Lighting.Brightness = v end
 })
-V_WD:AddButton({
+
+-- Actions
+V_MISC:AddButton({
     Text = "Stop All Features",
     Func = function()
-        AimbotCFG.On = false
-        lockedTarget = nil
-        lockTimer    = 0
+        AimbotCFG.On  = false
+        lockedTarget  = nil
+        lockTimer     = 0
         resetDelayedPos()
-        SACFG.On = false
+        SACFG.On      = false
         stopSA()
         ESPConfig.Enabled = false
         clearAllESP()
@@ -1124,8 +1077,13 @@ V_WD:AddButton({
         saFovCircle.Visible        = false
         crossImg.ImageTransparency = 1
         UIS.MouseIconEnabled       = true
-        Library:Notify("All stopped", 3)
+        Library:Notify("All features stopped", 3)
     end
+})
+
+V_MISC:AddButton({
+    Text = "Unload",
+    Func = function() Library:Unload() end
 })
 
 -- ─────────────────────────────────────────
@@ -1142,7 +1100,7 @@ ThemeManager:ApplyToTab(Tabs.UISettings)
 SaveManager:LoadAutoloadConfig()
 
 -- ═══════════════════════════════════════════
--- MAIN RENDER LOOP
+-- MAIN LOOP
 -- ═══════════════════════════════════════════
 RunService.RenderStepped:Connect(function(dt)
     camera = Workspace.CurrentCamera
@@ -1153,11 +1111,11 @@ RunService.RenderStepped:Connect(function(dt)
     fovCircle.Radius   = getEffectiveAimbotFOV()
     fovCircle.Visible  = AimbotCFG.DrawFOV and AimbotCFG.On and AimbotCFG.FOVStyle ~= "Invisible"
 
-    -- SA FOV circle — red = target found, blue = no target
+    -- SA FOV circle
     saFovCircle.Position = center
     saFovCircle.Radius   = SACFG.FOV
     if SACFG.On and SACFG.DrawFOV then
-        local myRoot = LP.Character and LP.Character:FindFirstChild("HumanoidRootPart")
+        local myRoot    = LP.Character and LP.Character:FindFirstChild("HumanoidRootPart")
         local hasTarget = saGetTarget(myRoot and myRoot.Position or camera.CFrame.Position) ~= nil
         saFovCircle.Color   = hasTarget
             and Color3.fromRGB(255, 50,  50)
@@ -1171,15 +1129,14 @@ RunService.RenderStepped:Connect(function(dt)
     updateESP()
 
     -- Aimbot
-    if AimbotCFG.On and CameraController then
-        -- Reaction delay
+    if AimbotCFG.On then
         if isInReaction then
             reactionTimer = reactionTimer - dt
             if reactionTimer <= 0 then isInReaction = false end
         end
 
         if not isInReaction then
-            -- Validate locked target
+            -- Validate current lock
             if lockedTarget and not isTargetValid(lockedTarget) then
                 lockedTarget = nil
                 lockTimer    = 0
@@ -1198,7 +1155,7 @@ RunService.RenderStepped:Connect(function(dt)
                 end
             end
 
-            -- Apply aim
+            -- Apply rotation
             if lockedTarget then
                 lockTimer = lockTimer + dt
                 if lockTimer > AimbotCFG.ForgotTime then
@@ -1208,21 +1165,7 @@ RunService.RenderStepped:Connect(function(dt)
                 elseif isInAimbotFOV(lockedTarget) then
                     local aimPos = getSmoothedPos(lockedTarget, dt)
                     if aimPos then
-                        local sm = math.clamp(
-                            1 / math.max(AimbotCFG.Smoothness, 0.1),
-                            0.01, 1
-                        )
-                        pcall(function()
-                            local cp  = camera.CFrame.Position
-                            local du  = (aimPos - cp).Unit
-                            local tP  = math.asin(math.clamp(du.Y, -1, 1))
-                            local tY  = math.atan2(-du.X, -du.Z)
-                            local cur = CameraController.Rotation
-                            CameraController:SetRotation(Vector2.new(
-                                cur.X + (tP - cur.X) * sm,
-                                cur.Y + angleDiff(cur.Y, tY) * sm
-                            ))
-                        end)
+                        rotateCameraToward(aimPos, dt)
                     end
                 else
                     lockedTarget = nil
@@ -1237,9 +1180,8 @@ end)
 -- ═══════════════════════════════════════════
 -- DONE
 -- ═══════════════════════════════════════════
-Library:Notify("Sniper Duel Tool | util.Raycast SA | AC Safe", 5)
-print("[SNIPER DUEL TOOL] Loaded")
-print("[AC] No Player:GetMouse() — UIS:GetMouseLocation() only")
-print("[AC] All services cloneref'd")
-print("[AC] All hooks newcclosure'd")
-print("[SA] util.Raycast hook — " .. (util_mod and "applied" or "FAILED: util_mod not found"))
+Library:Notify("Sniper Duel Tool | SA: " .. (util_mod and "Ready" or "FAILED") .. " | AC Safe", 5)
+print("[SNIPER DUEL] Loaded")
+print("[AC] No Player:GetMouse() — UIS only")
+print("[AIMBOT] CFrame-based — works PC and Mobile")
+print("[SA] util.Raycast hook — " .. (util_mod and "OK" or "FAILED"))
